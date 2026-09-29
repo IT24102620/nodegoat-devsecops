@@ -1,0 +1,8 @@
+rules:
+  - id: idor-userid-from-url-param
+    languages: [javascript]
+    severity: WARNING
+    message: >
+      User ID is taken from the URL (req.params.userId) without an ownership check.
+      Possible IDOR (CWE-639). Use the session user ID instead (req.session.userId).
+    pattern: req.params
