@@ -121,7 +121,10 @@ function SessionHandler(db) {
     };
 
     this.displayLogoutPage = (req, res) => {
-        req.session.destroy(() => res.redirect("/"));
+        req.session.destroy(() => {
+            res.clearCookie("sessionId");
+            res.redirect("/");
+        });
     };
 
     this.displaySignupPage = (req, res) => {
@@ -151,12 +154,14 @@ function SessionHandler(db) {
         const FNAME_RE = /^.{1,100}$/;
         const LNAME_RE = /^.{1,100}$/;
         const EMAIL_RE = /^[\S]+@[\S]+\.[\S]+$/;
-        const PASS_RE = /^.{1,20}$/;
+        const PASS_RE = /^(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{8,}$/;
+
+        //const PASS_RE = /^.{1,20}$/;
 
         /*
         //Fix for A2-2 - Broken Authentication - requires stronger password
         //(at least 8 characters with numbers and both lowercase and uppercase letters.)
-        const PASS_RE = /^(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{8,}$/;
+        const PASS_RE =/^(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{8,}$/;
         */
 
         errors.userNameError = "";
@@ -279,7 +284,9 @@ function SessionHandler(db) {
                         });
                         */
 
-                        req.session.regenerate(() => {
+                        req.session.regenerate((err) => {
+                            if (err) return next(err);
+
                             req.session.userId = user._id;
 
                             // Set userId property. Required for left nav menu links
