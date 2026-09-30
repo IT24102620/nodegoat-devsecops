@@ -101,20 +101,17 @@ function SessionHandler(db) {
                 }
             }
 
-            // A2-Broken Authentication and Session Management
-            // Upon login, a security best practice with regards to cookies session management
-            // would be to regenerate the session id so that if an id was already created for
-            // a user on an insecure medium (i.e: non-HTTPS website or otherwise), or if an
-            // attacker was able to get their hands on the cookie id before the user logged-in,
-            // then the old session id will render useless as the logged-in user with new privileges
-            // holds a new session id now.
+            // FIX for the  Session Management
+           
+            req.session.regenerate((err) => {
+                if (err) {
+                    return next(err);
+                }
 
-            // Fix the problem by regenerating a session in each login
-            // by wrapping the below code as a function callback for the method req.session.regenerate()
-            // i.e:
-            // `req.session.regenerate(() => {})`
-            req.session.userId = user._id;
-            return res.redirect(user.isAdmin ? "/benefits" : "/dashboard");
+                req.session.userId = user._id;
+
+                return res.redirect(user.isAdmin ? "/benefits" : "/dashboard");
+            });
         });
     };
 
@@ -226,7 +223,14 @@ function SessionHandler(db) {
                     /*
                     sessionDAO.startSession(user._id, (err, sessionId) => {
                         if (err) return next(err);
-                        res.cookie("session", sessionId);
+                        
+                        res.cookie("session", sessionId, {
+                            httpOnly: true,
+                            secure: true,
+                            sameSite: "lax",
+                            path: "/"
+                        });
+                        
                         req.session.userId = user._id;
                         return res.render("dashboard", { ...user, environmentalScripts });
                     });
@@ -236,12 +240,14 @@ function SessionHandler(db) {
                         // Set userId property. Required for left nav menu links
                         user.userId = user._id;
 
+                        if (user.isAdmin) {
+                            return res.redirect("/benefits");
+                        }else {
                         return res.render("dashboard", {
                             ...user,
                             environmentalScripts
-                        });
+                        })};
                     });
-
                 });
             });
         } else {
