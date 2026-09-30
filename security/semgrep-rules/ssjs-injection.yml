@@ -1,0 +1,9 @@
+rules:
+  - id: ssjs-injection-eval
+    languages: [javascript]
+    severity: ERROR
+    message: >
+      User-controlled input is passed directly to eval(), allowing Server-Side 
+      JavaScript Injection (SSJS). Possible Remote Code Execution (CWE-95).
+      Use safe parsing (e.g. parseInt, parseFloat) instead of eval().
+    pattern: eval(...)
