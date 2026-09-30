@@ -25,12 +25,11 @@ function SessionHandler(db) {
     this.isAdminUserMiddleware = (req, res, next) => {
         if (req.session.userId) {
             return userDAO.getUserById(req.session.userId, (err, user) => {
-               return user && user.isAdmin ? next() : res.redirect("/login");
+                return user && user.isAdmin ? next() : res.redirect("/login");
             });
         }
         console.log("redirecting to login");
         return res.redirect("/login");
-
     };
 
     this.isLoggedInMiddleware = (req, res, next) => {
@@ -55,13 +54,18 @@ function SessionHandler(db) {
             userName,
             password
         } = req.body;
+
         userDAO.validateLogin(userName, password, (err, user) => {
             const errorMessage = "Invalid username and/or password";
             const invalidUserNameErrorMessage = "Invalid username";
             const invalidPasswordErrorMessage = "Invalid password";
+
             if (err) {
                 if (err.noSuchUser) {
-                    console.log("Error: attempt to login with invalid user: ", userName);
+                    console.log(
+                        "Error: attempt to login with invalid user: ",
+                        userName
+                    );
 
                     // Fix for A1 - 3 Log Injection - encode/sanitize input for CRLF Injection
                     // that could result in log forging:
@@ -101,20 +105,18 @@ function SessionHandler(db) {
                 }
             }
 
-            // A2-Broken Authentication and Session Management
-            // Upon login, a security best practice with regards to cookies session management
-            // would be to regenerate the session id so that if an id was already created for
-            // a user on an insecure medium (i.e: non-HTTPS website or otherwise), or if an
-            // attacker was able to get their hands on the cookie id before the user logged-in,
-            // then the old session id will render useless as the logged-in user with new privileges
-            // holds a new session id now.
+            // FIX for the Session Management
+            req.session.regenerate((err) => {
+                if (err) {
+                    return next(err);
+                }
 
-            // Fix the problem by regenerating a session in each login
-            // by wrapping the below code as a function callback for the method req.session.regenerate()
-            // i.e:
-            // `req.session.regenerate(() => {})`
-            req.session.userId = user._id;
-            return res.redirect(user.isAdmin ? "/benefits" : "/dashboard");
+                req.session.userId = user._id;
+
+                return res.redirect(
+                    user.isAdmin ? "/benefits" : "/dashboard"
+                );
+            });
         });
     };
 
@@ -135,17 +137,26 @@ function SessionHandler(db) {
         });
     };
 
-    const validateSignup = (userName, firstName, lastName, password, verify, email, errors) => {
+    const validateSignup = (
+        userName,
+        firstName,
+        lastName,
+        password,
+        verify,
+        email,
+        errors
+    ) => {
 
         const USER_RE = /^.{1,20}$/;
         const FNAME_RE = /^.{1,100}$/;
         const LNAME_RE = /^.{1,100}$/;
         const EMAIL_RE = /^[\S]+@[\S]+\.[\S]+$/;
         const PASS_RE = /^.{1,20}$/;
+
         /*
-        //Fix for A2-2 - Broken Authentication -  requires stronger password
+        //Fix for A2-2 - Broken Authentication - requires stronger password
         //(at least 8 characters with numbers and both lowercase and uppercase letters.)
-        const PASS_RE =/^(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{8,}$/;
+        const PASS_RE = /^(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{8,}$/;
         */
 
         errors.userNameError = "";
@@ -160,29 +171,36 @@ function SessionHandler(db) {
             errors.userNameError = "Invalid user name.";
             return false;
         }
+
         if (!FNAME_RE.test(firstName)) {
             errors.firstNameError = "Invalid first name.";
             return false;
         }
+
         if (!LNAME_RE.test(lastName)) {
             errors.lastNameError = "Invalid last name.";
             return false;
         }
+
         if (!PASS_RE.test(password)) {
-            errors.passwordError = "Password must be 8 to 18 characters" +
+            errors.passwordError =
+                "Password must be 8 to 18 characters" +
                 " including numbers, lowercase and uppercase letters.";
             return false;
         }
+
         if (password !== verify) {
             errors.verifyError = "Password must match";
             return false;
         }
+
         if (email !== "") {
             if (!EMAIL_RE.test(email)) {
                 errors.emailError = "Invalid email address";
                 return false;
             }
         }
+
         return true;
     };
 
@@ -203,49 +221,85 @@ function SessionHandler(db) {
             "email": email
         };
 
-        if (validateSignup(userName, firstName, lastName, password, verify, email, errors)) {
+        if (
+            validateSignup(
+                userName,
+                firstName,
+                lastName,
+                password,
+                verify,
+                email,
+                errors
+            )
+        ) {
 
             userDAO.getUserByUserName(userName, (err, user) => {
 
                 if (err) return next(err);
 
                 if (user) {
-                    errors.userNameError = "User name already in use. Please choose another";
+                    errors.userNameError =
+                        "User name already in use. Please choose another";
+
                     return res.render("signup", {
                         ...errors,
                         environmentalScripts
                     });
                 }
 
-                userDAO.addUser(userName, firstName, lastName, password, email, (err, user) => {
+                userDAO.addUser(
+                    userName,
+                    firstName,
+                    lastName,
+                    password,
+                    email,
+                    (err, user) => {
 
-                    if (err) return next(err);
-
-                    //prepare data for the user
-                    prepareUserData(user, next);
-                    /*
-                    sessionDAO.startSession(user._id, (err, sessionId) => {
                         if (err) return next(err);
-                        res.cookie("session", sessionId);
-                        req.session.userId = user._id;
-                        return res.render("dashboard", { ...user, environmentalScripts });
-                    });
-                    */
-                    req.session.regenerate(() => {
-                        req.session.userId = user._id;
-                        // Set userId property. Required for left nav menu links
-                        user.userId = user._id;
 
-                        return res.render("dashboard", {
-                            ...user,
-                            environmentalScripts
+                        //prepare data for the user
+                        prepareUserData(user, next);
+
+                        /*
+                        sessionDAO.startSession(user._id, (err, sessionId) => {
+                            if (err) return next(err);
+
+                            res.cookie("session", sessionId, {
+                                httpOnly: true,
+                                secure: true,
+                                sameSite: "lax",
+                                path: "/"
+                            });
+
+                            req.session.userId = user._id;
+                            return res.render("dashboard", {
+                                ...user,
+                                environmentalScripts
+                            });
                         });
-                    });
+                        */
 
-                });
+                        req.session.regenerate(() => {
+                            req.session.userId = user._id;
+
+                            // Set userId property. Required for left nav menu links
+                            user.userId = user._id;
+
+                            if (user.isAdmin) {
+                                return res.redirect("/benefits");
+                            } else {
+                                return res.render("dashboard", {
+                                    ...user,
+                                    environmentalScripts
+                                });
+                            }
+                        });
+                    }
+                );
             });
         } else {
             console.log("user did not validate");
+
             return res.render("signup", {
                 ...errors,
                 environmentalScripts
@@ -257,7 +311,9 @@ function SessionHandler(db) {
         let userId;
 
         if (!req.session.userId) {
-            console.log("welcome: Unable to identify user...redirecting to login");
+            console.log(
+                "welcome: Unable to identify user...redirecting to login"
+            );
             return res.redirect("/login");
         }
 
@@ -265,7 +321,9 @@ function SessionHandler(db) {
 
         userDAO.getUserById(userId, (err, doc) => {
             if (err) return next(err);
+
             doc.userId = userId;
+
             return res.render("dashboard", {
                 ...doc,
                 environmentalScripts
