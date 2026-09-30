@@ -1,0 +1,58 @@
+name: DevSecOps Pipeline
+on: [push, pull_request]
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+      - run: npm install
+      - run: npm test --if-present
+      - run: docker compose build
+
+  sast-semgrep:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip install semgrep
+      - run: semgrep scan --config p/nodejs --config p/javascript --json -o semgrep.json || true
+      - run: semgrep scan --config p/nodejs --config p/javascript
+        continue-on-error: true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: semgrep-report
+          path: semgrep.json
+
+  sca-npm-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+      - run: npm install --package-lock-only
+      - run: npm audit --audit-level=critical
+        continue-on-error: true
+
+  secrets-gitleaks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Gitleaks (BLOCKING gate)
+        run: |
+          docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:latest \
+            detect --source /repo --no-git --verbose --exit-code 1
+
+  container-trivy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t nodegoat:ci .
+      - uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: nodegoat:ci
+          severity: HIGH,CRITICAL
+          exit-code: '0'
