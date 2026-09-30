@@ -76,6 +76,20 @@ MongoClient.connect(db, (err, db) => {
 
     // Enable session management using express middleware
     app.use(session({
+        secret: cookieSecret,
+        name: "sessionId",
+        saveUninitialized: false,
+        resave: false,
+        cookie: {
+            httpOnly: true,
+            sameSite: "lax",
+            path: "/",
+            maxAge: 30 * 60 * 1000,
+            secure: process.env.COOKIE_SECURE === "true"
+        }
+    }));
+
+/*        
         // genid: (req) => {
         //    return genuuid() // use UUIDs for session IDs
         //},
@@ -98,9 +112,9 @@ MongoClient.connect(db, (err, db) => {
             // secure: true
         }
         */
-
+/*
     }));
-
+*/
     /*
     // Fix for A8 - CSRF
     // Enable Express csrf protection
