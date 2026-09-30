@@ -242,11 +242,12 @@ function SessionHandler(db) {
 
                         if (user.isAdmin) {
                             return res.redirect("/benefits");
-                        }else {
-                        return res.render("dashboard", {
-                            ...user,
-                            environmentalScripts
-                        })};
+                        } else {
+                            return res.render("dashboard", {
+                                ...user,
+                                environmentalScripts
+                            });
+                        }
                     });
                 });
             });
