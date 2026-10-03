@@ -55,6 +55,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Inject SSL Private Key
+        run: |
+          mkdir -p artifacts/cert
+          echo "${{ secrets.SSL_PRIVATE_KEY }}" > artifacts/cert/server.key
       - run: docker build -t nodegoat:ci .
       - uses: aquasecurity/trivy-action@master
         with:
