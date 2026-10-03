@@ -41,6 +41,11 @@ jobs:
           docker run -d -p 27017:27017 mongo:4.0
           timeout 60s bash -c 'until nc -z -w 2 localhost 27017 && echo MongoDB ready; do sleep 2; done'
 
+       - name: Inject SSL Private Key
+        run: |
+          mkdir -p artifacts/cert
+          echo "${{ secrets.SSL_PRIVATE_KEY }}" > artifacts/cert/server.key
+          
       - name: Run E2E test suite
         id: test-suite
         run: |
